@@ -1,0 +1,40 @@
+[tool.black]
+line-length = 120
+include_trailing_comma = true
+target-version = ['py38']
+exclude = '''
+  /(
+      \.eggs         # exclude a few common directories in the
+    | \.git          # root of the project
+    | \.hg
+    | \.mypy_cache
+    | \.tox
+    | \venv
+    | _build
+    | buck-out
+    | build
+    | dist
+  )/
+
+'''
+
+[tool.poetry]
+name = "Piloton"
+version = "0.1.0"
+description = "A Digital Assist for Your Spin Bike"
+authors = ["Vince <vincentsantillo@gmail.com>"]
+license = "GPL-3.0-or-later"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+bleak = "^0.10.0"
+influxdb = "^5.3.1"
+rich = "^9.13.0"
+
+[tool.poetry.dev-dependencies]
+black = "^20.8b1"
+mypy = "^0.812"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
