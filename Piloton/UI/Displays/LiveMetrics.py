@@ -184,8 +184,7 @@ class LiveMetrics(Display):
         func_name = "__live_output"
 
         # Set status to active
-        if func_name not in self.piloton.loop_tracker:
-            self.piloton.loop_tracker[func_name] = LoopStatus.ACTIVE
+        self.piloton.loop_tracker[func_name] = LoopStatus.ACTIVE
 
         # Raise notification and link it to the handler
         with Live(self.generate_layout(), refresh_per_second=4, screen=True) as live:
