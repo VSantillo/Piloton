@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from influxdb import InfluxDBClient
 from typing import Tuple, TYPE_CHECKING
+
+from influxdb import InfluxDBClient
+
 
 # Only import when type_checking
 if TYPE_CHECKING:
@@ -42,3 +44,5 @@ class InfluxMixin(_Base):  # type: ignore
             database=self.influx_database,
         )
         self.logger.debug("Successfully set up InfluxDB Client")
+
+        super().__init__()

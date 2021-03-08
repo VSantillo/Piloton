@@ -8,3 +8,4 @@ class LoopStatus(Enum):
 
     INACTIVE = 0
     ACTIVE = 1
+    CONNECTING = 2

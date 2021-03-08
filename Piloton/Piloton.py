@@ -1,25 +1,20 @@
-import array
+import os
+import json
 import signal
 import asyncio
 import logging
-import datetime
-from typing import MutableMapping
+from datetime import datetime
+from typing import List, Dict
 
-from Piloton.Types import HeartZone, HeartZones, LoopStatus, PowerZone, PowerZones
-from Piloton.Mixins import BleakMixin, InfluxMixin, RichMixin
-
-
-# TODO: User-specific, set in JSON or CLI
-FTP: int = 195
-AGE: int = 27
-
-# Significant data UUIDs
-INDOOR_BIKE_DATA_UUID = "00002ad2-0000-1000-8000-00805f9b34fb"
-HRM_DATA_UUID = "00002a37-0000-1000-8000-00805f9b34fb"
+from Piloton.Devices import Bike, HRM
+from Piloton.Mixins import BleakMixin, InfluxMixin, LoggingMixin, RichMixin
+from Piloton.Types import Device, HeartZone, HeartZones, LoopStatus, Menu, PowerZone, PowerZones
+from Piloton.UI.Menus import MainMenu
+from Piloton.UI.Displays import LiveMetrics
 
 
-class Piloton(InfluxMixin, RichMixin, BleakMixin):  # type: ignore
-    def __init__(self, bike_name: str, hrm_name: str):
+class Piloton(InfluxMixin, RichMixin, BleakMixin, LoggingMixin):  # type: ignore
+    def __init__(self, data_path: str = "data/"):
         # Set up Logger
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.info("Piloton is starting up!")
@@ -36,30 +31,60 @@ class Piloton(InfluxMixin, RichMixin, BleakMixin):  # type: ignore
 
         # Set up our Asyncio loop and tracker
         self._loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
-        self._loop_tracker: MutableMapping[str, LoopStatus] = {}
+        self.loop_tracker: Dict[str, LoopStatus] = {}
+        # Detect if data_path is present
+        if not os.path.exists(data_path):
+            self.logger.critical("Unable to find Piloton data path. Quitting now.")
+            exit(1)
+        self.data_path = data_path
 
-        # Set our Bluetooth-related variables
-        self.bike_name: str = bike_name
-        self.hrm_name: str = hrm_name
-        self.bike_ble_address: str = ""
-        self.hrm_ble_address: str = ""
+        # Load Device data
+        with open(f"{self.data_path}devices.json", "r") as fh:
+            device_info = json.load(fh)
+            self.logger.info("Device Data Loaded")
 
-        # Set our Physical Bike Metrics (all instantaneous forms)
-        self.bike_speed: float = 0.0  # mph
-        self.bike_cadence: int = 0  # rpm
-        self.bike_power: int = 0  # Watts
-        self.bike_resistance: int = 0  # Unitless, IC4 resistance
-        self.heart_rate: int = 0  # BPM
+        # Load User data
+        with open(f"{self.data_path}users.json", "r") as fh:
+            user_info = json.load(fh)
+            self.logger.info("User Data Loaded")
 
-        # Set up our Zone information
+        # Set up our devices
+        self.bike: Bike = Bike(device_info["bike"])
+        self.hrm: HRM = HRM(device_info["hrm"])
+        self.devices: List[Device] = [self.bike, self.hrm]
+
+        # Set up performance metrics
         self.heart_zone: HeartZone = HeartZone.NO_ZONE
+        self.heart_zones: HeartZones = HeartZones(age=user_info["age"])
         self.power_zone: PowerZone = PowerZone.NO_ZONE
-        self.power_zones: PowerZones = PowerZones(ftp=FTP)
-        self.heart_zones: HeartZones = HeartZones(age=AGE)
+        self.power_zones: PowerZones = PowerZones(ftp=user_info["ftp"])
 
         # Attach signal handlers
         signal.signal(signal.SIGTERM, self.stop)
         signal.signal(signal.SIGINT, self.stop)
+
+    def update(self) -> None:
+        """
+        Update User and Device data from json
+        """
+        # Load Device data
+        with open(f"{self.data_path}devices.json", "r") as fh:
+            device_info = json.load(fh)
+            self.logger.info("Device Data Loaded")
+
+        # Load User data
+        with open(f"{self.data_path}users.json", "r") as fh:
+            user_info = json.load(fh)
+            self.logger.info("User Data Loaded")
+
+        # Set up our devices
+        self.bike = Bike(device_info["bike"])
+        self.hrm = HRM(device_info["hrm"])
+        self.devices = [self.bike, self.hrm]
+
+        # Set up performance metrics
+        self.heart_zones = HeartZones(age=user_info["age"])
+        self.power_zones = PowerZones(ftp=user_info["ftp"])
 
     def stop(self, *args, **kwargs) -> None:
         """
@@ -69,33 +94,39 @@ class Piloton(InfluxMixin, RichMixin, BleakMixin):  # type: ignore
         :param kwargs: Unnecessary, don't include
         :return: Nothing
         """
-        # Find active loops
-        for loop, value in self._loop_tracker.items():
-            if value == LoopStatus.ACTIVE:
-                self._loop_tracker[loop] = LoopStatus.INACTIVE
+        # Find active device loops
+        for device in self.devices:
+            if device.loop_status != LoopStatus.INACTIVE:
+                device.loop_status = LoopStatus.INACTIVE
+
+        # Find active non-device loops
+        for loop, value in self.loop_tracker.items():
+            if value != LoopStatus.INACTIVE:
+                self.loop_tracker[loop] = LoopStatus.INACTIVE
+
+    def scan_for_devices(self) -> bool:
+        """
+        Scan for devices
+
+        :return: True, if all devices found. False, else.
+        :rtype: bool
+        """
+        # Attempt to scan for all devices
+        for device in self.devices:
+
+            # Attempt to find device
+            device_found: bool = device.scan_for_device(self._loop)
+            if not device_found:
+                return False
+
+        return True
 
     def __indoor_bike_data_handler(self, sender, data):
-        # Unpack from data bytes
-        data_bytes: bytes = bytes(data)[:-1]
-        data_array: array = array.array("h", data_bytes)  # 'h' = treat data as 2-byte short
+        # Update Bike with data
+        self.bike.update(data)
 
-        # TODO: This block assumes that the bike being listened to only broadcasts 0x44-02 in its prefix.
-        #  To support multiple bikes, this portion should be addressable based on the features string.
-        #  However, because I don't have access to that information (and subsequently know what
-        #  transformations are necessary), this block is hardcoded for the IC4.
-        features: int = data_array[0]
-        speed: int = data_array[1]  # This value is always km/h
-        cadence: int = data_array[2]
-        power: int = data_array[3]
-
-        # Set physical bike metrics
-        self.bike_speed = (speed / 100) * 0.6213711922
-        self.bike_cadence = cadence * 0.5
-        self.bike_power = power
-
-        # TODO: Predict resistance here
-        self.bike_resistance = 17
-        self.power_zone = self.power_zones.calculate_power_zone(power)
+        # Calculate Power Zone
+        self.power_zone = self.power_zones.calculate_power_zone(self.bike.power)
 
         # Write data point to Influx
         data_point = [
@@ -104,9 +135,9 @@ class Piloton(InfluxMixin, RichMixin, BleakMixin):  # type: ignore
                 "tags": {},
                 "time": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "fields": {
-                    "speed": self.bike_speed,
-                    "cadence": self.bike_cadence,
-                    "power": self.bike_power,
+                    "speed": self.bike.speed,
+                    "cadence": self.bike.cadence,
+                    "power": self.bike.power,
                     "power_zone": self.power_zone.value,
                 },
             }
@@ -114,11 +145,11 @@ class Piloton(InfluxMixin, RichMixin, BleakMixin):  # type: ignore
         self.influx_client.write_points(data_point)
 
     def __hrm_data_handler(self, sender, data):
-        # Unpack from data bytes
-        data_bytes: bytes = bytes(data)
+        # Update HRM with data
+        self.hrm.update(data)
 
-        self.heart_rate = int.from_bytes(data_bytes, "big")
-        self.heart_zone = self.heart_zones.calculate_heart_zone(self.heart_rate)
+        # Calculate Heart Zone
+        self.heart_zone = self.heart_zones.calculate_heart_zone(self.hrm.heart_rate)
 
         # Write data point to Influx
         data_point = [
@@ -127,86 +158,77 @@ class Piloton(InfluxMixin, RichMixin, BleakMixin):  # type: ignore
                 "tags": {},
                 "time": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "fields": {
-                    "heart_rate": self.heart_rate,
+                    "heart_rate": self.hrm.heart_rate,
                     "zone": self.heart_zone.value,
                 },
             }
         ]
         self.influx_client.write_points(data_point)
 
-    def scan_for_bike(self) -> None:
-        """
-        Scan for device and set BLE address
-        """
-        # Warn, if address is already present
-        if self.bike_ble_address:
-            self.logger.warning("Scanning for Bike, but address already present.")
-
-        # Start scanning process
-        self.logger.info("Scanning for BLE Device by Name: %s", self.bike_name)
-
-        escape_counter: int = 0  # Give up after 5 tries
-        while not self.bike_ble_address:
-            # Use Asyncio to find bike
-            ble_address = self._loop.run_until_complete(self.__scan_for_device(device_name=self.bike_name))
-
-            if ble_address:
-                self.logger.debug("Setting self.bike_ble_address = %s", ble_address)
-                self.bike_ble_address = ble_address
-            else:
-                self.logger.warning("Unable to find bike. Retrying...")
-                if escape_counter < 4:
-                    escape_counter += 1
-                else:
-                    self.logger.warning("Unable to find bike.")
-
-                    # TODO: Figure out how to handle this elegantly.
-                    exit()
-
-    def scan_for_hrm(self) -> None:
-        """
-        Scan for device and set BLE address
-        """
-        # Warn, if address is already present
-        if self.hrm_ble_address:
-            self.logger.warning("Scanning for HRM, but address already present")
-
-        # Start scanning process
-        self.logger.info("Scanning for BLE Device by Name: %s", self.hrm_name)
-
-        escape_counter: int = 0  # Give up after 5 tries
-        while not self.hrm_ble_address:
-            ble_address = self._loop.run_until_complete(self.__scan_for_device(device_name=self.hrm_name))
-
-            if ble_address:
-                self.logger.debug("Setting self.hrm_ble_address = %s", ble_address)
-                self.hrm_ble_address = ble_address
-            else:
-                self.logger.warning("Unable to find HRM. Retrying...")
-                if escape_counter < 4:
-                    escape_counter += 1
-                else:
-                    self.logger.warning("Unable to find HRM.")
-
-                    # TODO: Figure out how to handle this elegantly.
-                    exit()
-
     def poll_indoor_bike_data(self):
-        return self._loop.run_until_complete(
-            self.__poll_device(self.bike_ble_address, INDOOR_BIKE_DATA_UUID, self.__indoor_bike_data_handler)
-        )
+        return self._loop.run_until_complete(self.bike.poll_device(self.__indoor_bike_data_handler))
 
     def poll_hrm_data(self):
-        return self._loop.run_until_complete(
-            self.__poll_device(self.hrm_ble_address, HRM_DATA_UUID, self.__hrm_data_handler)
-        )
+        return self._loop.run_until_complete(self.hrm.poll_device(self.__hrm_data_handler))
 
-    def poll_data(self):
+    def poll_data(self, live_metrics):
         tasks = asyncio.gather(
             *(
-                self._live_output(),
-                self.__poll_device(self.bike_ble_address, INDOOR_BIKE_DATA_UUID, self.__indoor_bike_data_handler),
-                self.__poll_device(self.hrm_ble_address, HRM_DATA_UUID, self.__hrm_data_handler),
+                self.bike.poll_device(self.__indoor_bike_data_handler),
+                self.hrm.poll_device(self.__hrm_data_handler),
+                live_metrics.live_output(),
             )
         )
         return self._loop.run_until_complete(tasks)
+
+    def start_workout(self, length: int):
+        """
+        Start Workout of length. If no length, run until Ctrl+C
+
+        :param length:
+        :return:
+        """
+        # Scan for bike
+        self.logger.info("Scanning for devices before starting workout.")
+        self.scan_for_devices()
+
+        self.logger.info("Beginning workout!")
+        return self.poll_data(LiveMetrics(self))
+
+    def app(self):
+        """
+
+        :return:
+        """
+        active: bool = True
+        current_view = MainMenu
+        last_menu = MainMenu
+        while active:
+            # Call current view
+            if callable(current_view):
+                current_view = current_view()
+
+            # Render Menu
+            if isinstance(current_view, Menu):
+                # Show menu and prompt user for input
+                selection: int = self.render_menu(current_view)
+
+                # Set up breadcrumb to return to this menu, if form
+                last_menu = current_view
+
+                # Handle the selection, returning if none.
+                current_view = current_view.handle_selection(selection)
+                if current_view is None:
+                    self.logger.info("Quitting Piloton")
+                    active = False
+
+            # Render "Form"
+            if isinstance(current_view, list):
+                response = self.render_form(current_view)
+                if isinstance(response, int):
+                    self.start_workout(response)  # Live view will override here
+                    current_view = MainMenu
+                elif response is not None:
+                    current_view = response()
+                else:
+                    current_view = last_menu
