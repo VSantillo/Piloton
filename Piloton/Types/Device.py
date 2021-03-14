@@ -35,6 +35,7 @@ class Device(LoggingMixin, BleakMixin):  # type: ignore
         self.logger.info("Scanning for BLE Device by Name: %s", self.name)
 
         # Attempt to find device
+        self.loop_status = LoopStatus.ACTIVE
         escape_counter: int = 0  # Give up after 5 tries
         result: bool = True
         while not self.ble_address and self.loop_status == LoopStatus.ACTIVE:

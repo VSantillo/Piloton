@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple, Union
 from rich.prompt import IntPrompt
 from Piloton.Types import Form, FormPrompt
 from Piloton.UI.Menus import MainMenu
@@ -22,6 +22,6 @@ class Workout(Form):
     def _start_workout(response):
         # Return if user signaled quitting
         if response == -1:
-            return MainMenu
+            return
 
-        return response
+        return "workout", response

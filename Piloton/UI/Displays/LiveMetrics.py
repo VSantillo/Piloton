@@ -16,30 +16,62 @@ from rich.text import Text
 
 class LiveMetrics(Display):
     def __init__(self, piloton):
+        """
+        Initialize Live Metrics display
+
+        :param Piloton piloton: Piloton object to pass data through
+        """
         self.piloton = piloton
 
     def _generate_cadence_panel(self) -> Panel:
+        """
+        Generate cadence readout
+
+        :return: Cadence readout
+        """
         text = Text(f"\n{round(self.piloton.bike.cadence)}\n", justify="center")
         text.stylize("bold white")
         panel = Panel(text, title="Cadence (RPM)", box=box.HEAVY, border_style="#BF211E")
         return panel
 
     def _generate_resistance_panel(self) -> Panel:
+        """
+        Generate resistance readout
+
+        :return: Resistance readout
+        """
         text = Text(f"\n{self.piloton.bike.resistance}\n", justify="center")
         text.stylize("bold white")
         panel = Panel(text, title="Resistance", box=box.HEAVY, border_style="#E9CE2C")
         return panel
 
     def _generate_power_panel(self) -> Panel:
+        """
+        Generate Power readout
+
+        :return: Power readout
+        """
         text = Text(f"\n{round(self.piloton.bike.power)}\n", justify="center")
         text.stylize("bold white")
         panel = Panel(text, title="Power (W)", box=box.HEAVY, border_style="#E89005")
         return panel
 
     def _generate_heart_zone_header(self, heart_zone: HeartZone) -> Tuple[str, str]:
+        """
+        Generate header for Heart Zone panel
+
+        :param HeartZone heart_zone: Heart zone to interpret
+        :return: Heart Zone header
+        """
         return f"{heart_zone}\n", f"bold {self.piloton.heart_zones.COLORS[heart_zone]}"
 
     def _generate_heart_zone_progress_bar(self, current_zone: HeartZone) -> List[Tuple[str, str]]:
+        """
+        Generate Heart Zone progress bar
+
+        :param HeartZone current_zone: Heart zone to interpret
+        :return: Heart Zone progress bar
+        """
         bar = [(f"«««", "bold white")]
 
         # Build up the bar, rendering the color based on if the current zone exceeds it
@@ -54,6 +86,11 @@ class LiveMetrics(Display):
         return bar
 
     def _generate_heart_rate_panel(self) -> Panel:
+        """
+        Generate Heart Zone panel: Heart Zone, Progress Bar, and HRM readout
+
+        :return: Heart rate Panel
+        """
         text = Text.assemble(
             self._generate_heart_zone_header(self.piloton.heart_zone),
             *self._generate_heart_zone_progress_bar(self.piloton.heart_zone),
@@ -65,14 +102,30 @@ class LiveMetrics(Display):
         panel = Panel(text, title="Heart Rate (BPM)", box=box.HEAVY, border_style=current_color)
         return panel
 
-    def _generate_power_zone_header(self, zone_number: int, zone: PowerZone, ftp_percent: float):
-        return (
+    def _generate_power_zone_header(
+        self, zone_number: int, zone: PowerZone, ftp_percent: float
+    ) -> List[Tuple[str, str]]:
+        """
+        Genereate Power Zone Header
+
+        :param int zone_number: Current PowerZone number
+        :param zone zone: Current PowerZone zone
+        :param float ftp_percent: Current user power as percentage of ftp
+        :return: Power zone panel header
+        """
+        return [
             (f"{zone_number} - ", "white"),
             (f"{zone}", f"bold {self.piloton.power_zones.COLORS[zone]}"),
             (f" - {round(ftp_percent)}%\n", "white"),
-        )
+        ]
 
-    def _generate_power_zone_bar(self, current_zone: PowerZone):
+    def _generate_power_zone_bar(self, current_zone: PowerZone) -> List[Tuple[str, str]]:
+        """
+        Generate Power Zone bar
+
+        :param PowerZone current_zone: Current PowerZone
+        :return: Power zone bar
+        """
         bar = [("«««", "bold white")]
 
         # Build up the bar, rendering the color based on if the current zone exceeds it
@@ -86,16 +139,34 @@ class LiveMetrics(Display):
 
         return bar
 
-    def _generate_power_zone_footer(self, low_limit, low_color, cur_power, cur_color, up_limit, up_color):
-        return (
+    def _generate_power_zone_footer(
+        self, low_limit, low_color, cur_power, cur_color, up_limit, up_color
+    ) -> List[Tuple[str, str]]:
+        """
+        Genereawte Power Zone footer
+
+        :param low_limit: Lower PowerZone limit
+        :param low_color: Lower PowerZone limit color
+        :param cur_power: Current PowerZone limit
+        :param cur_color: Current PowerZone limit color
+        :param up_limit: Next PowerZone limit
+        :param up_color: Next PowerZone limit color
+        :return: Power zone information for footer
+        """
+        return [
             (f"{low_limit}", low_color),
             (" - ", "white"),
             (f"{round(cur_power)}", cur_color),
             (" - ", "white"),
             (f"{up_limit}", up_color),
-        )
+        ]
 
     def _generate_power_zone_panel(self) -> Panel:
+        """
+        Generate the Power Zone panel from the current bike reading
+
+        :return: Power Zone panel
+        """
         # Calculate FTP percent
         ftp: int = self.piloton.power_zones.ftp
         ftp_percent: float = self.piloton.bike.power / ftp * 100
@@ -180,6 +251,9 @@ class LiveMetrics(Display):
         return layout
 
     async def live_output(self):
+        """
+        Live Metrics Output Loop. Will continue until signal interrupt.
+        """
         # Get function name
         func_name = "__live_output"
 

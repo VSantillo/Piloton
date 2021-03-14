@@ -37,7 +37,13 @@ class BleakMixin(_Base):  # type: ignore
 
         return address
 
-    async def poll_device(self, data_handler: Callable, data_uuid: str):
+    async def poll_device(self, data_handler: Callable, data_uuid: str) -> None:
+        """
+        Poll device based on UUID data and handle response
+
+        :param Callable data_handler: Function to handle data
+        :param str data_uuid: UUID of Data being polled for
+        """
         self.loop_status = LoopStatus.CONNECTING  # For display purposes, need to connect before loading UI
         async with BleakClient(self.ble_address) as client:
             # Wait until we're connected with the device

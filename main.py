@@ -2,7 +2,6 @@
 import logging
 
 from Piloton import Piloton
-from Piloton.UI.Menus import MainMenu
 from utils import setup_logger, set_logger_level
 
 if __name__ == "__main__":

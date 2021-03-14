@@ -21,7 +21,7 @@ exclude = '''
 [tool.poetry]
 name = "Piloton"
 version = "0.1.0"
-description = "A Digital Assist for Your Spin Bike"
+description = "A Digital Assistant for Your Spin Bike"
 authors = ["Vince <vincentsantillo@gmail.com>"]
 license = "GPL-3.0-or-later"
 
@@ -30,6 +30,8 @@ python = "^3.9"
 bleak = "^0.10.0"
 influxdb = "^5.3.1"
 rich = "^9.13.0"
+scikit-learn = "^0.24.1"
+numpy = "^1.20.1"
 
 [tool.poetry.dev-dependencies]
 black = "^20.8b1"

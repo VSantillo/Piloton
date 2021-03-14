@@ -31,7 +31,8 @@ class PowerZones(Zones):
     def __init__(self, ftp: int):
         """
         Initialize Power Zones
-        :param ftp:
+
+        :param int: User Functional Threshold Power (FTP)
         """
         self.ftp = ftp
         super().__init__()

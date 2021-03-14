@@ -13,7 +13,7 @@ class MainMenu(Menu):
             "Workout": Workout.start_workout,
             "User Settings": UserSettings.UserSettings,
             "Device Settings": DeviceSettings.DeviceSettings,
-            "Training": Training,
+            "Training": Training.start_training,
             "Quit": None,
         }
         super().__init__(options)

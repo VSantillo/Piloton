@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from typing import Tuple, TYPE_CHECKING
+from typing import Dict, Tuple, TYPE_CHECKING
 
 from influxdb import InfluxDBClient
 
@@ -27,8 +25,6 @@ class InfluxMixin(_Base):  # type: ignore
     def __init__(self):
         """
         Set up Influx Client
-
-        :return:
         """
         # Warn if any fields are missing from Base
         if any(not hasattr(self, requirement) for requirement in _MEMBER_REQUIREMENTS):
@@ -46,3 +42,16 @@ class InfluxMixin(_Base):  # type: ignore
         self.logger.debug("Successfully set up InfluxDB Client")
 
         super().__init__()
+
+    def write_data_point(self, measurement: str, tags: Dict, time: str, fields: Dict) -> None:
+        """
+        Write Data Point to Influx
+
+        :param str measurement: Measurement to write data point to
+        :param Dict tags: Tags associated to data point
+        :param str time: Time of data point
+        :param Dict fields: Fields of data point
+        :return: Nothing
+        """
+        data_point = [{"measurement": measurement, "tags": tags, "time": time, "fields": fields}]
+        self.influx_client.write_points(data_point)

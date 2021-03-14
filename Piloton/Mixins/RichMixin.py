@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, List
+from typing import List, TYPE_CHECKING
 
 from rich.console import Console
 from rich.prompt import IntPrompt
@@ -18,6 +18,9 @@ else:
 
 class RichMixin(_Base):  # type: ignore
     def __init__(self):
+        """
+        Initialize Rich console
+        """
         self._console = Console()
 
         super().__init__()

@@ -23,9 +23,21 @@ class FormPrompt:
         self.kwargs: Dict[Any] = kwargs
 
     def run(self, console=None):
+        """
+        Return prompt to console
+
+        :param console: Active rich console
+        :return: Prompt being asked
+        """
         return self.prompt.ask(*self.args, console=console, **self.kwargs)
 
     def handle_response(self, response):
+        """
+        Handle form response
+
+        :param Any response: Call the handler with the response
+        :return: Response from handler
+        """
         return self.handler(response)
 
 
