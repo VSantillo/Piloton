@@ -111,6 +111,8 @@ respective cadence. These values will get fit a Classifier and then predicted
 during a workout. You will need to train on as many values of resistance as you 
 want to see.
 
+When you want to end training on a specific cadence, press `Ctrl+C`
+
 ![Training Screen](https://thumbs.gfycat.com/ShortSoftEchidna-size_restricted.gif)
 
 I recognize that this process is long and tedious. I don't really know much 
