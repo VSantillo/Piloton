@@ -26,7 +26,7 @@ authors = ["Vince <vincentsantillo@gmail.com>"]
 license = "GPL-3.0-or-later"
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.8"
 bleak = "^0.10.0"
 influxdb = "^5.3.1"
 rich = "^9.13.0"
